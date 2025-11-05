@@ -2,10 +2,15 @@
 NLP Service for Question Classification and Topic Extraction
 Uses transformer models for semantic understanding
 """
-from sentence_transformers import SentenceTransformer
-from sklearn.cluster import KMeans, DBSCAN
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
+try:
+    from sentence_transformers import SentenceTransformer
+    from sklearn.cluster import KMeans, DBSCAN
+    from sklearn.metrics.pairwise import cosine_similarity
+    import numpy as np
+    ML_AVAILABLE = True
+except ImportError:
+    ML_AVAILABLE = False
+    
 import re
 from typing import List, Dict, Tuple, Any
 import logging
@@ -25,13 +30,18 @@ class NLPService:
         
     async def initialize(self):
         """Load pre-trained models"""
+        if not ML_AVAILABLE:
+            logger.warning("ML libraries not available. NLP features will be limited.")
+            return
+            
         try:
             logger.info(f"Loading model: {settings.MODEL_NAME}")
             self.model = SentenceTransformer(settings.MODEL_NAME)
             logger.info("NLP model loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load NLP model: {e}")
-            raise
+            # Don't raise - allow app to work without ML features
+            logger.warning("App will run with limited NLP features")
     
     async def extract_questions(self, text: str) -> List[str]:
         """
@@ -118,6 +128,11 @@ class NLPService:
         if not questions:
             return {}
         
+        # If ML not available, use simple keyword-based classification
+        if not ML_AVAILABLE or self.model is None:
+            logger.warning("Using fallback keyword-based classification")
+            return await self._keyword_based_classification(questions)
+        
         try:
             # Generate embeddings
             logger.info(f"Generating embeddings for {len(questions)} questions")
@@ -150,6 +165,39 @@ class NLPService:
         except Exception as e:
             logger.error(f"Question classification error: {e}")
             return {"General": questions}
+    
+    async def _keyword_based_classification(self, questions: List[str]) -> Dict[str, List[str]]:
+        """Fallback keyword-based classification when ML is not available"""
+        topic_keywords = {
+            'Algorithms': ['algorithm', 'sorting', 'searching', 'complexity'],
+            'Data Structures': ['array', 'linked list', 'tree', 'graph', 'stack', 'queue'],
+            'Databases': ['database', 'sql', 'query', 'table', 'relation'],
+            'Networking': ['network', 'protocol', 'tcp', 'ip', 'osi'],
+            'Operating Systems': ['process', 'thread', 'memory', 'cpu', 'scheduling'],
+            'Programming': ['code', 'function', 'class', 'variable', 'loop'],
+            'Mathematics': ['calculus', 'algebra', 'equation', 'probability', 'statistics'],
+        }
+        
+        classified = defaultdict(list)
+        unclassified = []
+        
+        for question in questions:
+            q_lower = question.lower()
+            matched = False
+            
+            for topic, keywords in topic_keywords.items():
+                if any(kw in q_lower for kw in keywords):
+                    classified[topic].append(question)
+                    matched = True
+                    break
+            
+            if not matched:
+                unclassified.append(question)
+        
+        if unclassified:
+            classified['General'] = unclassified
+        
+        return dict(classified)
     
     async def _extract_topic_name(self, questions: List[str]) -> str:
         """
@@ -217,6 +265,11 @@ class NLPService:
         if len(questions) < 2:
             return []
         
+        # If ML not available, use simple text matching
+        if not ML_AVAILABLE or self.model is None:
+            logger.warning("Using fallback text-based similarity detection")
+            return self._text_based_similarity(questions)
+        
         try:
             # Generate embeddings
             embeddings = self.model.encode(questions, show_progress_bar=False)
@@ -252,6 +305,40 @@ class NLPService:
         except Exception as e:
             logger.error(f"Similar question detection error: {e}")
             return []
+    
+    def _text_based_similarity(self, questions: List[str]) -> List[Dict[str, Any]]:
+        """Fallback text-based similarity when ML is not available"""
+        similar_groups = []
+        processed = set()
+        
+        for i in range(len(questions)):
+            if i in processed:
+                continue
+            
+            group = [i]
+            q1_words = set(questions[i].lower().split())
+            
+            for j in range(i + 1, len(questions)):
+                if j not in processed:
+                    q2_words = set(questions[j].lower().split())
+                    # Jaccard similarity
+                    intersection = len(q1_words & q2_words)
+                    union = len(q1_words | q2_words)
+                    similarity = intersection / union if union > 0 else 0
+                    
+                    if similarity >= 0.5:  # Lower threshold for text-based
+                        group.append(j)
+                        processed.add(j)
+            
+            if len(group) > 1:
+                similar_groups.append({
+                    'questions': [questions[idx] for idx in group],
+                    'indices': group,
+                    'similarity': 0.7  # Approximate
+                })
+                processed.add(i)
+        
+        return similar_groups
     
     async def calculate_importance_scores(self, questions: List[str], 
                                           topics: Dict[str, List[str]],
