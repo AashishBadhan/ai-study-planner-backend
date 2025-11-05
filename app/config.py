@@ -45,10 +45,15 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        # Allow extra fields from environment
+        extra = "ignore"
 
 
 # Global settings instance
 settings = Settings()
 
-# Ensure upload directory exists
-os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+# Ensure upload directory exists (skip on serverless)
+try:
+    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+except:
+    pass  # Serverless environments may not allow directory creation

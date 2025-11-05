@@ -32,28 +32,34 @@ async def lifespan(app: FastAPI):
     logger.info("Starting AI Study Planner application...")
     
     try:
-        # Connect to database
+        # Connect to database (optional for Vercel)
         try:
             await db.connect_db()
             logger.info("Database connected")
         except Exception as db_error:
             logger.warning(f"Database connection failed (will work in limited mode): {db_error}")
         
-        # Initialize NLP model
-        await nlp_service.initialize()
-        logger.info("NLP model loaded")
+        # Initialize NLP model (optional - will use fallback if not available)
+        try:
+            await nlp_service.initialize()
+            logger.info("NLP model loaded")
+        except Exception as nlp_error:
+            logger.warning(f"NLP model loading failed (using fallback): {nlp_error}")
         
         logger.info("Application startup complete")
         
     except Exception as e:
-        logger.error(f"Startup failed: {e}")
-        raise
+        logger.error(f"Startup warning: {e}")
+        # Don't raise - allow app to start even with errors
     
     yield
     
     # Shutdown
     logger.info("Shutting down application...")
-    await db.close_db()
+    try:
+        await db.close_db()
+    except:
+        pass
     logger.info("Application shutdown complete")
 
 
