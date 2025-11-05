@@ -1,0 +1,24 @@
+services:
+  # Backend API Service
+  - type: web
+    name: ai-study-planner-backend
+    runtime: python
+    buildCommand: pip install --upgrade pip setuptools wheel && pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_NAME
+        value: ai_study_planner
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: False
+      - key: CORS_ORIGINS
+        value: '["https://your-frontend-url.onrender.com"]'
+      - key: MODEL_NAME
+        value: sentence-transformers/all-MiniLM-L6-v2
+      - key: DEVICE
+        value: cpu

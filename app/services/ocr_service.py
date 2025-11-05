@@ -2,10 +2,17 @@
 OCR and Text Extraction Service
 Handles PDF, Image, and Text file processing
 """
-import pytesseract
+try:
+    import pytesseract
+    from pdf2image import convert_from_path
+    TESSERACT_AVAILABLE = True
+except ImportError:
+    TESSERACT_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("Tesseract/pdf2image not available - OCR features disabled")
+
 from PIL import Image
 from PyPDF2 import PdfReader
-from pdf2image import convert_from_path
 import io
 import os
 import logging
