@@ -38,15 +38,17 @@ async def upload_file(file: UploadFile = File(...)):
         # Read file content
         content = await file.read()
         
-        # For now, just return success (no actual storage in serverless)
+        # For now, just return success with expected response format
         return {
             "success": True,
             "message": "File uploaded successfully",
             "filename": file.filename,
-            "size": len(content),
-            "type": file.content_type,
             "paper_id": "demo_paper_123",
-            "note": "File processing is limited in serverless environment"
+            "extracted_text_length": len(content),
+            "questions_extracted": 5,  # Demo value
+            "topics_identified": ["Sample Topic 1", "Sample Topic 2", "Sample Topic 3"],  # Demo topics
+            "file_type": file.content_type,
+            "note": "Demo mode - File processing limited in serverless"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -70,11 +72,23 @@ def get_topics():
     }
 
 @app.get("/api/analysis/questions")
-def get_questions():
+def get_questions(topic: str = None, limit: int = 100):
     """Get questions"""
+    # Return demo questions in expected format
+    demo_questions = [
+        {
+            "_id": f"q{i}",
+            "text": f"Sample question {i} about {topic or 'general topic'}?",
+            "topic": topic or "General",
+            "importance_score": 0.8 - (i * 0.05)
+        }
+        for i in range(1, 6)
+    ]
+    
     return {
         "success": True,
-        "questions": [],
-        "message": "No questions available"
+        "questions": demo_questions,
+        "count": len(demo_questions),
+        "message": "Demo questions (serverless mode)"
     }
 
